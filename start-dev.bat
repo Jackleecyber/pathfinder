@@ -1,0 +1,16 @@
+@echo off
+echo Starting Cascade Development Servers...
+
+echo Starting Backend API...
+start "Cascade Backend" cmd /k "cd backend && npm run dev"
+
+echo Starting Excel Add-in...
+start "Cascade Excel Add-in" cmd /k "cd excel-addin && npm run dev"
+
+echo Both servers are starting...
+echo Backend API: http://localhost:3000
+echo Excel Add-in: https://localhost:3001
+echo.
+echo Press any key to exit...
+pause > nul
+

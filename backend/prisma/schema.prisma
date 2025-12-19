@@ -1,0 +1,735 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  avatar    String?
+  role      UserRole @default(USER)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  sessions         Session[]
+  auditLogs        AuditLog[]
+  preferences      UserPreferences?
+  fileUploads      FileUpload[]
+  webScrapes       WebScrape[]
+  chatMessages     ChatMessage[]
+  actions          CascadeAction[]
+  studentProfile   StudentProfile?
+  mentorProfile    MentorProfile?
+  cvs              CV[]
+  mockInterviews   MockInterview[]
+  mentorshipSessions MentorshipSession[]
+  progressTracking ProgressTracking[]
+  jobOffers        JobOffer[]
+  alumni           Alumni?
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model UserPreferences {
+  id              String  @id @default(cuid())
+  userId          String  @unique
+  theme           String  @default("light")
+  language        String  @default("en")
+  defaultCurrency String  @default("USD")
+  autoSave        Boolean @default(true)
+  notifications   Json    @default("{\"email\": true, \"inApp\": true}")
+  shortcuts       Json    @default("{}")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model FileUpload {
+  id           String        @id @default(cuid())
+  userId       String
+  name         String
+  type         String
+  size         Int
+  status       UploadStatus  @default(UPLOADING)
+  filePath     String?
+  extractedData Json?
+  error        String?
+  metadata     Json?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("file_uploads")
+}
+
+model WebScrape {
+  id            String      @id @default(cuid())
+  userId        String
+  url           String
+  title         String?
+  status        ScrapeStatus @default(PENDING)
+  extractedData Json?
+  error         String?
+  metadata      Json?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("web_scrapes")
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  role      MessageRole
+  content   String
+  context   Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actions CascadeAction[]
+
+  @@map("chat_messages")
+}
+
+model CascadeAction {
+  id          String      @id @default(cuid())
+  userId      String
+  messageId   String?
+  type        ActionType
+  payload     Json
+  confidence  Float
+  status      ActionStatus @default(PENDING)
+  preview     Json?
+  provenance  Json?
+  error       String?
+  executedAt  DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message ChatMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@map("cascade_actions")
+}
+
+model FinancialData {
+  id        String   @id @default(cuid())
+  type      DataType
+  period    String
+  values    Json
+  metadata  Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("financial_data")
+}
+
+model FinancialModel {
+  id        String   @id @default(cuid())
+  name      String
+  type      ModelType
+  inputs    Json
+  outputs   Json
+  formulas  Json
+  scenarios Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("financial_models")
+}
+
+model DataConnector {
+  id        String         @id @default(cuid())
+  name      String
+  type      ConnectorType
+  config    Json
+  status    ConnectorStatus @default(DISCONNECTED)
+  lastSync  DateTime?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@map("data_connectors")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  details   Json
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("audit_logs")
+}
+
+model Embedding {
+  id        String   @id @default(cuid())
+  text      String
+  embedding Float[]
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@map("embeddings")
+}
+
+model Job {
+  id        String     @id @default(cuid())
+  type      JobType
+  status    JobStatus  @default(PENDING)
+  payload   Json
+  result    Json?
+  error     String?
+  attempts  Int        @default(0)
+  maxAttempts Int     @default(3)
+  scheduledAt DateTime?
+  startedAt DateTime?
+  completedAt DateTime?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@map("jobs")
+}
+
+// Enums
+enum UserRole {
+  USER
+  STUDENT
+  MENTOR
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum UploadStatus {
+  UPLOADING
+  PROCESSING
+  COMPLETED
+  ERROR
+}
+
+enum ScrapeStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  ERROR
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum ActionType {
+  INSERT_VALUES
+  GENERATE_FORMULA
+  CREATE_CHART
+  BUILD_PIVOT
+  ASK_CLARIFICATION
+  EXTRACT_DATA
+  ANALYZE_FINANCIALS
+}
+
+enum ActionStatus {
+  PENDING
+  EXECUTING
+  COMPLETED
+  ERROR
+}
+
+enum DataType {
+  INCOME_STATEMENT
+  BALANCE_SHEET
+  CASH_FLOW
+  TRANSACTION_DATA
+  MARKET_DATA
+}
+
+enum ModelType {
+  DCF
+  COMPARABLE
+  PRECEDENT
+  LBO
+  CUSTOM
+}
+
+enum ConnectorType {
+  BLOOMBERG
+  FACTSET
+  CAPIQ
+  REFINITIV
+  PITCHBOOK
+  CUSTOM
+}
+
+enum ConnectorStatus {
+  CONNECTED
+  DISCONNECTED
+  ERROR
+}
+
+enum JobType {
+  FILE_PROCESSING
+  WEB_SCRAPING
+  AI_ANALYSIS
+  DATA_SYNC
+  EMAIL_NOTIFICATION
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// Mentorship Platform Models
+model StudentProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  university      String?
+  major           String?
+  graduationYear  Int?
+  gpa             Float?
+  targetIndustry  Industry[]
+  targetRoles     String[]
+  currentStage    CareerStage @default(EXPLORING)
+  bio             String?
+  linkedinUrl     String?
+  githubUrl       String?
+  portfolioUrl    String?
+  skills          String[]
+  languages       String[]
+  timezone        String?
+  preferredMentorTypes MentorType[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cvs             CV[]
+  mockInterviews  MockInterview[]
+  mentorshipSessions MentorshipSession[]
+  progressTracking ProgressTracking[]
+  jobOffers       JobOffer[]
+
+  @@map("student_profiles")
+}
+
+model MentorProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  currentCompany  String?
+  currentRole     String?
+  previousCompanies String[]
+  industries      Industry[]
+  expertise       String[]
+  yearsExperience Int?
+  education       Json?
+  certifications  String[]
+  bio             String?
+  linkedinUrl     String?
+  availability    Json?
+  maxStudents     Int      @default(10)
+  currentStudents Int      @default(0)
+  rating          Float    @default(0)
+  totalReviews    Int      @default(0)
+  isVerified      Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  timezone        String?
+  languages       String[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mentorshipSessions MentorshipSession[]
+  interviewQuestions InterviewQuestion[]
+  mockInterviews  MockInterview[]
+
+  @@map("mentor_profiles")
+}
+
+model CV {
+  id              String   @id @default(cuid())
+  studentId       String
+  title           String
+  version         String   @default("1.0")
+  content         Json
+  fileUrl         String?
+  status          CVStatus @default(DRAFT)
+  aiFeedback      Json?
+  mentorFeedback  Json?
+  score           Float?
+  lastReviewedAt DateTime?
+  isPrimary       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  student         StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@map("cvs")
+}
+
+model MockInterview {
+  id              String   @id @default(cuid())
+  studentId       String
+  mentorId        String?
+  title           String
+  type            InterviewType
+  industry        Industry?
+  company         String?
+  role            String?
+  status          InterviewStatus @default(SCHEDULED)
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  duration        Int?
+  recordingUrl    String?
+  transcript      Json?
+  questions       Json?
+  studentAnswers  Json?
+  feedback        Json?
+  score           Float?
+  strengths       String[]
+  improvements    String[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  student         StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  mentor         MentorProfile? @relation(fields: [mentorId], references: [id], onDelete: SetNull)
+
+  @@map("mock_interviews")
+}
+
+model InterviewQuestion {
+  id              String   @id @default(cuid())
+  mentorId        String?
+  type            QuestionType
+  category        String
+  industry        Industry?
+  difficulty      Difficulty
+  question        String
+  expectedAnswer  String?
+  tips            String[]
+  keywords        String[]
+  isVerified      Boolean  @default(false)
+  usageCount      Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  mentor          MentorProfile? @relation(fields: [mentorId], references: [id], onDelete: SetNull)
+
+  @@map("interview_questions")
+}
+
+model MentorshipSession {
+  id              String   @id @default(cuid())
+  studentId       String
+  mentorId        String
+  type            SessionType
+  title           String
+  description     String?
+  status          SessionStatus @default(SCHEDULED)
+  scheduledAt     DateTime
+  startedAt       DateTime?
+  completedAt     DateTime?
+  duration        Int?
+  notes           String?
+  actionItems     Json?
+  recordingUrl    String?
+  studentRating   Int?
+  mentorRating    Int?
+  studentFeedback String?
+  mentorFeedback  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  student         StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  mentor          MentorProfile  @relation(fields: [mentorId], references: [id], onDelete: Cascade)
+
+  @@map("mentorship_sessions")
+}
+
+model ProgressTracking {
+  id              String   @id @default(cuid())
+  studentId       String
+  category        ProgressCategory
+  metric          String
+  value           Float
+  target          Float?
+  notes           String?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  student         StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@map("progress_tracking")
+}
+
+model JobOffer {
+  id              String   @id @default(cuid())
+  studentId       String
+  company         String
+  role            String
+  industry        Industry
+  location        String?
+  salary          Float?
+  bonus           Float?
+  totalComp       Float?
+  currency        String   @default("USD")
+  offerDate       DateTime
+  deadline        DateTime?
+  status          OfferStatus @default(PENDING)
+  notes           String?
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  student         StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@map("job_offers")
+}
+
+model Alumni {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  graduationYear  Int?
+  currentCompany  String?
+  currentRole     String?
+  industry        Industry?
+  location        String?
+  linkedinUrl     String?
+  isActive        Boolean  @default(true)
+  canMentor       Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("alumni")
+}
+
+model NetworkingEvent {
+  id              String   @id @default(cuid())
+  title           String
+  description     String?
+  type            EventType
+  industry        Industry?
+  location        String?
+  virtualLink     String?
+  startDate       DateTime
+  endDate         DateTime?
+  maxAttendees    Int?
+  currentAttendees Int    @default(0)
+  isExclusive     Boolean @default(false)
+  status          EventStatus @default(UPCOMING)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("networking_events")
+}
+
+model ResourceLibrary {
+  id              String   @id @default(cuid())
+  title           String
+  description     String?
+  type            ResourceType
+  category        String
+  industry        Industry?
+  content         Json
+  fileUrl         String?
+  externalUrl     String?
+  tags            String[]
+  isPremium       Boolean  @default(false)
+  viewCount       Int      @default(0)
+  downloadCount   Int      @default(0)
+  rating          Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("resource_library")
+}
+
+// Mentorship Enums
+enum Industry {
+  FINANCE
+  CONSULTING
+  TECHNOLOGY
+  INVESTMENT_BANKING
+  PRIVATE_EQUITY
+  VENTURE_CAPITAL
+  HEDGE_FUND
+  ASSET_MANAGEMENT
+  CORPORATE_STRATEGY
+  PRODUCT_MANAGEMENT
+  SOFTWARE_ENGINEERING
+  DATA_SCIENCE
+  OTHER
+}
+
+enum CareerStage {
+  EXPLORING
+  PREPARING
+  APPLYING
+  INTERVIEWING
+  NEGOTIATING
+  ACCEPTED
+}
+
+enum MentorType {
+  INDUSTRY_EXPERT
+  RECRUITER
+  CAREER_COACH
+  TECHNICAL_MENTOR
+  BEHAVIORAL_COACH
+}
+
+enum CVStatus {
+  DRAFT
+  UNDER_REVIEW
+  APPROVED
+  NEEDS_REVISION
+}
+
+enum InterviewType {
+  TECHNICAL
+  BEHAVIORAL
+  CASE_STUDY
+  SYSTEM_DESIGN
+  MIXED
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum QuestionType {
+  TECHNICAL
+  BEHAVIORAL
+  CASE_STUDY
+  SYSTEM_DESIGN
+  BRAIN_TEASER
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+  EXPERT
+}
+
+enum SessionType {
+  ONE_ON_ONE
+  GROUP
+  WORKSHOP
+  WEBINAR
+  MOCK_INTERVIEW
+  CV_REVIEW
+  NETWORKING
+}
+
+enum SessionStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  RESCHEDULED
+}
+
+enum ProgressCategory {
+  CV_QUALITY
+  INTERVIEW_SKILLS
+  TECHNICAL_SKILLS
+  NETWORKING
+  APPLICATIONS
+  OFFERS
+  CONFIDENCE
+}
+
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  NEGOTIATING
+  EXPIRED
+}
+
+enum EventType {
+  NETWORKING
+  WORKSHOP
+  WEBINAR
+  PANEL
+  ALUMNI_MEETUP
+  COMPANY_VISIT
+}
+
+enum EventStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum ResourceType {
+  DOCUMENT
+  VIDEO
+  TEMPLATE
+  GUIDE
+  CHECKLIST
+  TEMPLATE_CV
+  INTERVIEW_QUESTIONS
+  CASE_STUDY
+}
